@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UK Flood Monitoring Map</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            max-width: 300px;
+        }
+
+        .info-panel h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #1a1a1a;
+        }
+
+        .info-panel p {
+            font-size: 12px;
+            color: #666;
+            line-height: 1.5;
+            margin-bottom: 10px;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 30px;
+            right: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            min-width: 200px;
+        }
+
+        .legend h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #1a1a1a;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .legend-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 50%;
+            border: 2px solid rgba(0,0,0,0.3);
+        }
+
+        .legend-icon.station {
+            background: #3388ff;
+        }
+
+        .legend-icon.warning-severe {
+            background: #d32f2f;
+        }
+
+        .legend-icon.warning {
+            background: #ff9800;
+        }
+
+        .legend-icon.alert {
+            background: #fdd835;
+        }
+
+        .legend-icon.area {
+            background: rgba(100, 149, 237, 0.3);
+            border-radius: 3px;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            transition: opacity 0.3s;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3388ff;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            font-size: 16px;
+            color: #666;
+        }
+
+        .status-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 8px 15px;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+            z-index: 1000;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .attribution {
+            font-size: 11px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        /* Custom popup styles */
+        .leaflet-popup-content {
+            margin: 15px;
+            font-size: 13px;
+        }
+
+        .popup-title {
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: #1a1a1a;
+        }
+
+        .popup-detail {
+            margin: 5px 0;
+            color: #666;
+        }
+
+        .popup-label {
+            font-weight: 600;
+            color: #444;
+        }
+
+        .severity-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .severity-severe {
+            background: #d32f2f;
+            color: white;
+        }
+
+        .severity-warning {
+            background: #ff9800;
+            color: white;
+        }
+
+        .severity-alert {
+            background: #fdd835;
+            color: #333;
+        }
+
+        /* Layer control styling */
+        .leaflet-control-layers {
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <div class="info-panel">
+        <h2>🌊 UK Flood Monitoring</h2>
+        <p>Real-time flood warnings, monitoring stations, and water levels across England.</p>
+        <p><strong>Use the layer control (top right)</strong> to toggle different datasets.</p>
+    </div>
+
+    <div class="legend">
+        <h3>Legend</h3>
+        <div class="legend-item">
+            <div class="legend-icon station"></div>
+            <span>Monitoring Station</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-icon warning-severe"></div>
+            <span>Severe Flood Warning</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-icon warning"></div>
+            <span>Flood Warning</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-icon alert"></div>
+            <span>Flood Alert</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-icon area"></div>
+            <span>Flood Area</span>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loadingText">Loading flood monitoring data...</div>
+    </div>
+
+    <div class="status-bar">
+        <div id="statusText">Initializing...</div>
+        <div class="attribution">
+            This uses Environment Agency flood and river level data from the real-time data API (Beta)
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+
+    <!-- App JS -->
+    <script src="app.js"></script>
+</body>
+</html>
