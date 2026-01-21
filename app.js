@@ -532,19 +532,41 @@ function createStationsLayer(geojson) {
 // Create floods layer
 function createFloodsLayer(geojson) {
     layerGroups.floods = L.geoJSON(geojson, {
-        pane: 'pointsPane',
+        pane: 'polygonsPane', // Polygons go here
         coordsToLatLng: (coords) => {
             // GeoJSON is [lng, lat], Leaflet expects [lat, lng]
             return L.latLng(coords[1], coords[0]);
         },
+
+        // Styling for Polygons
+        style: (feature) => {
+            if (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') {
+                const severity = feature.properties.severity;
+                let color;
+                switch (severity) {
+                    case 1: color = '#d32f2f'; break; // Severe
+                    case 2: color = '#ff9800'; break; // Warning
+                    case 3: color = '#fdd835'; break; // Alert
+                    default: color = '#999'; break;
+                }
+                return {
+                    fillColor: color,
+                    color: color,
+                    weight: 2,
+                    opacity: 0.8,
+                    fillOpacity: 0.4
+                };
+            }
+        },
+
+        // Styling for Points (Fallback)
         pointToLayer: (feature, latlng) => {
             const severity = feature.properties.severity;
             let color;
-
             switch (severity) {
-                case 1: color = '#d32f2f'; break; // Severe
-                case 2: color = '#ff9800'; break; // Warning
-                case 3: color = '#fdd835'; break; // Alert
+                case 1: color = '#d32f2f'; break;
+                case 2: color = '#ff9800'; break;
+                case 3: color = '#fdd835'; break;
                 default: color = '#999'; break;
             }
 
@@ -554,9 +576,11 @@ function createFloodsLayer(geojson) {
                 color: '#fff',
                 weight: 2,
                 opacity: 1,
-                fillOpacity: 0.9
+                fillOpacity: 0.9,
+                pane: 'pointsPane' // Force points to top pane
             });
         },
+
         onEachFeature: (feature, layer) => {
             const props = feature.properties;
             const severityClass = props.severity === 1 ? 'severe' :
@@ -580,6 +604,12 @@ function createFloodsLayer(geojson) {
                 </div>
             `;
             layer.bindPopup(popup, { maxWidth: 300 });
+
+            // Hover effect for polygons
+            if (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') {
+                layer.on('mouseover', () => layer.setStyle({ fillOpacity: 0.7, weight: 3 }));
+                layer.on('mouseout', () => layer.setStyle({ fillOpacity: 0.4, weight: 2 }));
+            }
         }
     });
 }
