@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UK Flood Monitoring Map</title>
+    <title>UK Hazard Map - Floods & Landslides</title>
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -105,6 +105,10 @@
         .legend-icon.area {
             background: rgba(100, 149, 237, 0.3);
             border-radius: 3px;
+        }
+
+        .legend-icon.landslide {
+            background: #8b4513;
         }
 
         .loading-overlay {
@@ -224,8 +228,8 @@
     <div id="map"></div>
 
     <div class="info-panel">
-        <h2>🌊 UK Flood Monitoring</h2>
-        <p>Real-time flood warnings, monitoring stations, and water levels across England.</p>
+        <h2>🌊 UK Hazard Map</h2>
+        <p>Real-time flood warnings, monitoring stations, water levels, and landslide data across England.</p>
         <p><strong>Use the layer control (top right)</strong> to toggle different datasets.</p>
     </div>
 
@@ -251,17 +255,21 @@
             <div class="legend-icon area"></div>
             <span>Flood Area</span>
         </div>
+        <div class="legend-item">
+            <div class="legend-icon landslide"></div>
+            <span>Landslide</span>
+        </div>
     </div>
 
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
-        <div class="loading-text" id="loadingText">Loading flood monitoring data...</div>
+        <div class="loading-text" id="loadingText">Loading hazard data...</div>
     </div>
 
     <div class="status-bar">
         <div id="statusText">Initializing...</div>
         <div class="attribution">
-            This uses Environment Agency flood and river level data from the real-time data API (Beta)
+            Data from Environment Agency Real-time Flood Monitoring API (Beta) and British Geological Survey (BGS) OGC API
         </div>
     </div>
 

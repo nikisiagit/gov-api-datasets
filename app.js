@@ -1,13 +1,15 @@
 // UK Flood Monitoring Map Application
-// Data source: Environment Agency Real-time Flood Monitoring API
+// Data sources: Environment Agency Real-time Flood Monitoring API & BGS Landslide Data
 
 const API_BASE = 'https://environment.data.gov.uk/flood-monitoring';
+const BGS_API_BASE = 'https://ogcapi.bgs.ac.uk';
 
 // API Endpoints
 const ENDPOINTS = {
     stations: `${API_BASE}/id/stations`,
     floods: `${API_BASE}/id/floods`,
-    floodAreas: `${API_BASE}/id/floodAreas`
+    floodAreas: `${API_BASE}/id/floodAreas`,
+    landslides: `${BGS_API_BASE}/collections/landslides/items?f=json&limit=5000`
 };
 
 // Global map and layer groups
@@ -15,7 +17,8 @@ let map;
 let layerGroups = {
     stations: null,
     floods: null,
-    floodAreas: null
+    floodAreas: null,
+    landslides: null
 };
 
 // Status tracking
@@ -50,14 +53,15 @@ function initializeMap() {
 // Main data loading function
 async function loadAllData() {
     const startTime = Date.now();
-    updateStatus('Loading data from Environment Agency API...');
+    updateStatus('Loading data from APIs...');
 
     try {
         // Load all data sources in parallel for optimal performance
-        const [stationsData, floodsData, floodAreasData] = await Promise.all([
+        const [stationsData, floodsData, floodAreasData, landslidesData] = await Promise.all([
             fetchData(ENDPOINTS.stations, 'Monitoring Stations'),
             fetchData(ENDPOINTS.floods, 'Flood Warnings'),
-            fetchData(ENDPOINTS.floodAreas, 'Flood Areas')
+            fetchData(ENDPOINTS.floodAreas, 'Flood Areas'),
+            fetchLandslidesData(ENDPOINTS.landslides, 'BGS Landslides')
         ]);
 
         // Convert to GeoJSON and create layers
@@ -66,17 +70,19 @@ async function loadAllData() {
         const stationsGeoJSON = convertStationsToGeoJSON(stationsData);
         const floodsGeoJSON = convertFloodsToGeoJSON(floodsData);
         const areasGeoJSON = convertFloodAreasToGeoJSON(floodAreasData);
+        const landslidesGeoJSON = landslidesData; // Already in GeoJSON format from BGS
 
         // Create map layers
         createStationsLayer(stationsGeoJSON);
         createFloodsLayer(floodsGeoJSON);
         createFloodAreasLayer(areasGeoJSON);
+        createLandslidesLayer(landslidesGeoJSON);
 
         // Add layer control
         addLayerControl();
 
         const loadTime = ((Date.now() - startTime) / 1000).toFixed(2);
-        updateStatus(`Loaded successfully in ${loadTime}s - ${stationsGeoJSON.features.length} stations, ${floodsGeoJSON.features.length} warnings, ${areasGeoJSON.features.length} areas`);
+        updateStatus(`Loaded successfully in ${loadTime}s - ${stationsGeoJSON.features.length} stations, ${floodsGeoJSON.features.length} warnings, ${areasGeoJSON.features.length} areas, ${landslidesGeoJSON.features.length} landslides`);
 
         hideLoading();
 
@@ -107,6 +113,33 @@ async function fetchData(url, name) {
         console.error(`Error fetching ${name}:`, error);
         updateStatus(`Warning: Could not load ${name}`);
         return [];
+    }
+}
+
+// Fetch landslides data from BGS API (returns GeoJSON directly)
+async function fetchLandslidesData(url, name) {
+    updateLoadingText(`Fetching ${name}...`);
+
+    try {
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log(`${name} loaded:`, data.features?.length || 0, 'features');
+
+        // BGS API returns GeoJSON directly
+        return {
+            type: 'FeatureCollection',
+            features: data.features || []
+        };
+
+    } catch (error) {
+        console.error(`Error fetching ${name}:`, error);
+        updateStatus(`Warning: Could not load ${name}`);
+        return { type: 'FeatureCollection', features: [] };
     }
 }
 
@@ -391,12 +424,56 @@ function createFloodAreasLayer(geojson) {
     });
 }
 
+// Create landslides layer
+function createLandslidesLayer(geojson) {
+    layerGroups.landslides = L.geoJSON(geojson, {
+        coordsToLatLng: (coords) => {
+            // GeoJSON is [lng, lat], Leaflet expects [lat, lng]
+            return L.latLng(coords[1], coords[0]);
+        },
+        pointToLayer: (feature, latlng) => {
+            return L.circleMarker(latlng, {
+                radius: 5,
+                fillColor: '#8b4513',
+                color: '#fff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8
+            });
+        },
+        onEachFeature: (feature, layer) => {
+            const props = feature.properties;
+
+            // Build popup with available properties
+            let popup = '<div class="popup-title">⚠️ Landslide Data</div>';
+
+            // Add any available properties dynamically
+            if (props) {
+                Object.keys(props).forEach(key => {
+                    if (props[key] && key !== 'id' && key !== '@id') {
+                        const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        const value = typeof props[key] === 'object' ? JSON.stringify(props[key]) : props[key];
+                        popup += `<div class="popup-detail"><span class="popup-label">${displayKey}:</span> ${value}</div>`;
+                    }
+                });
+            }
+
+            popup += `<div class="popup-detail" style="margin-top: 8px; font-size: 11px; color: #999;">
+                Source: BGS Landslides API
+            </div>`;
+
+            layer.bindPopup(popup);
+        }
+    });
+}
+
 // Add layer control
 function addLayerControl() {
     const overlays = {
         '<span style="color: #3388ff;">●</span> Monitoring Stations (EA Stations API)': layerGroups.stations,
         '<span style="color: #ff9800;">●</span> Flood Warnings (EA Floods API)': layerGroups.floods,
-        '<span style="color: #6495ed;">▬</span> Flood Warning Areas (EA Flood Areas API)': layerGroups.floodAreas
+        '<span style="color: #6495ed;">▬</span> Flood Warning Areas (EA Flood Areas API)': layerGroups.floodAreas,
+        '<span style="color: #8b4513;">●</span> Landslides (BGS API)': layerGroups.landslides
     };
 
     // Add all layers to map by default
