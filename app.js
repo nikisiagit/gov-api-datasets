@@ -329,8 +329,8 @@ function convertStationsToGeoJSON(stations) {
 }
 
 // Convert flood warnings to GeoJSON
-function convertFloodsToGeoJSON(floods, floodAreas = []) {
-    // Create a lookup map for flood areas: ID -> Polygon
+function convertFloodsToGeoJSON(floods, floodAreas = [], polygonCache = new Map()) {
+    // Create a lookup map for flood areas: ID -> Polygon URL
     const areaMap = new Map();
     if (floodAreas) {
         floodAreas.forEach(area => {
@@ -346,77 +346,121 @@ function convertFloodsToGeoJSON(floods, floodAreas = []) {
     const features = floods
         .filter(flood => flood.eaAreaName)
         .map(flood => {
-            // Extract coordinates if available
-            let coordinates = [-1.5, 52.8]; // Default to center of England
+            let geometry = null;
             let foundLocation = false;
 
-            // 1. Try generic lat/long
-            if (flood.lat && flood.long) {
-                coordinates = [flood.long, flood.lat];
+            // 1. Try to get Polygon URL
+            let polygonUrl = flood.floodArea ? flood.floodArea.polygon : null;
+
+            // If embedded is missing, try lookup using areaID
+            if (!polygonUrl) {
+                const areaID = flood.floodArea ? flood.floodArea['@id'] : flood.floodAreaID;
+                polygonUrl = areaMap.get(areaID) || areaMap.get(flood.floodAreaID);
+            }
+
+            // 2. Try to get GEOMETRY from cache
+            if (polygonUrl && polygonCache.has(polygonUrl)) {
+                geometry = polygonCache.get(polygonUrl);
                 foundLocation = true;
             }
 
-            // 2. Try embedded polygon (rare for alerts)
-            if (!foundLocation && flood.floodArea && flood.floodArea.polygon) {
-                const polygon = flood.floodArea.polygon;
-                // If it's a real WKT string
-                if (typeof polygon === 'string' && polygon.startsWith('POLYGON')) {
-                    const coords = extractPolygonCoordinates(polygon);
-                    if (coords.length > 0) {
-                        coordinates = calculateCentroid(coords);
-                        foundLocation = true;
-                    }
+            // Fallback: WKT string (if API changes back)
+            if (!foundLocation && typeof polygonUrl === 'string' && polygonUrl.startsWith('POLYGON')) {
+                const coords = extractPolygonCoordinates(polygonUrl);
+                if (coords.length > 0) {
+                    geometry = {
+                        type: 'Polygon',
+                        coordinates: [coords]
+                    };
+                    foundLocation = true;
                 }
             }
 
-            // 3. Try Lookup from Flood Areas (The Fix)
-            if (!foundLocation && flood.floodAreaID) {
-                // Try to find the polygon in our loaded areas
-                // The floodArea in the alert usually has an @id like http://.../floodAreas/ID
-                const areaIDUrl = flood.floodArea['@id'];
-
-                let polygon = areaMap.get(areaIDUrl) || areaMap.get(flood.floodAreaID);
-
-                if (polygon && typeof polygon === 'string' && polygon.startsWith('POLYGON')) {
-                    const coords = extractPolygonCoordinates(polygon);
-                    if (coords.length > 0) {
-                        coordinates = calculateCentroid(coords);
-                        foundLocation = true;
-                    }
-                }
+            // 3. Fallback to Point (lat/long) if no polygon
+            if (!foundLocation && flood.lat && flood.long) {
+                geometry = {
+                    type: 'Point',
+                    coordinates: [flood.long, flood.lat]
+                };
+                foundLocation = true;
             }
 
-            // If we still have no location, we might want to skip it or put it in a "Unknown" bucket
-            // But for now we keep the default but maybe flag it?
-            // Actually, let's just use the default but it will be visible in the middle of nowhere (Derby-ish).
+            // If still no location, skip
+            if (!foundLocation) {
+                return null;
+            }
 
             return {
                 type: 'Feature',
-                geometry: {
-                    type: 'Point',
-                    coordinates: coordinates
-                },
-                properties: {
-                    id: flood['@id'],
-                    areaName: flood.eaAreaName,
-                    severity: flood.severityLevel || 3,
-                    severityText: getSeverityText(flood.severityLevel),
-                    description: flood.description || 'No description available',
-                    message: flood.message || '',
-                    timeRaised: flood.timeRaised || 'Unknown',
-                    timeChanged: flood.timeMessageChanged || flood.timeRaised || 'Unknown',
-                    type: 'flood',
-                    hasLocation: foundLocation
-                }
-            };
+                geometry: geometry,
+
+                // 1. Try generic lat/long
+                if(flood.lat && flood.long) {
+                    coordinates = [flood.long, flood.lat];
+    foundLocation = true;
+}
+
+// 2. Try embedded polygon (rare for alerts)
+if (!foundLocation && flood.floodArea && flood.floodArea.polygon) {
+    const polygon = flood.floodArea.polygon;
+    // If it's a real WKT string
+    if (typeof polygon === 'string' && polygon.startsWith('POLYGON')) {
+        const coords = extractPolygonCoordinates(polygon);
+        if (coords.length > 0) {
+            coordinates = calculateCentroid(coords);
+            foundLocation = true;
+        }
+    }
+}
+
+// 3. Try Lookup from Flood Areas (The Fix)
+if (!foundLocation && flood.floodAreaID) {
+    // Try to find the polygon in our loaded areas
+    // The floodArea in the alert usually has an @id like http://.../floodAreas/ID
+    const areaIDUrl = flood.floodArea['@id'];
+
+    let polygon = areaMap.get(areaIDUrl) || areaMap.get(flood.floodAreaID);
+
+    if (polygon && typeof polygon === 'string' && polygon.startsWith('POLYGON')) {
+        const coords = extractPolygonCoordinates(polygon);
+        if (coords.length > 0) {
+            coordinates = calculateCentroid(coords);
+            foundLocation = true;
+        }
+    }
+}
+
+// If we still have no location, we might want to skip it or put it in a "Unknown" bucket
+// But for now we keep the default but maybe flag it?
+// Actually, let's just use the default but it will be visible in the middle of nowhere (Derby-ish).
+
+return {
+    type: 'Feature',
+    geometry: {
+        type: 'Point',
+        coordinates: coordinates
+    },
+    properties: {
+        id: flood['@id'],
+        areaName: flood.eaAreaName,
+        severity: flood.severityLevel || 3,
+        severityText: getSeverityText(flood.severityLevel),
+        description: flood.description || 'No description available',
+        message: flood.message || '',
+        timeRaised: flood.timeRaised || 'Unknown',
+        timeChanged: flood.timeMessageChanged || flood.timeRaised || 'Unknown',
+        type: 'flood',
+        hasLocation: foundLocation
+    }
+};
         });
 
 
 
-    return {
-        type: 'FeatureCollection',
-        features: features
-    };
+return {
+    type: 'FeatureCollection',
+    features: features
+};
 }
 
 // Convert flood areas to GeoJSON
