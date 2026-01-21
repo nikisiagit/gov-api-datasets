@@ -1,19 +1,20 @@
-# UK Flood Monitoring Map
+# UK Hazard Map - Floods & Landslides
 
-An interactive web map visualizing real-time flood monitoring data from the UK Environment Agency. This application displays monitoring stations, active flood warnings, and flood warning areas across England.
+An interactive web map visualizing real-time flood monitoring data from the UK Environment Agency and landslide data from the British Geological Survey. This application displays monitoring stations, active flood warnings, flood warning areas, and landslide locations across England.
 
-![UK Flood Monitoring Map](https://img.shields.io/badge/status-active-success)
+![UK Hazard Map](https://img.shields.io/badge/status-active-success)
 ![No Authentication Required](https://img.shields.io/badge/auth-none-blue)
 ![License](https://img.shields.io/badge/license-OGL-green)
 
 ## Features
 
-- **Real-time Data**: Live flood warnings and monitoring station data
+- **Real-time Data**: Live flood warnings, monitoring station data, and landslide information
 - **Interactive Map**: Click on markers and areas to see detailed information
 - **Multiple Layers**: Toggle between different datasets:
   - 📍 Monitoring Stations (water level and flow measurement points)
   - ⚠️ Flood Warnings (current warnings by severity level)
   - 🗺️ Flood Warning Areas (geographic boundaries)
+  - 🟤 Landslides (geological hazard locations from BGS)
 - **High Performance**: Optimized data fetching with parallel API calls
 - **GeoJSON Format**: Efficient geographic data format for smooth map interactions
 - **Responsive Design**: Works on desktop and mobile devices
@@ -21,7 +22,9 @@ An interactive web map visualizing real-time flood monitoring data from the UK E
 
 ## Data Sources
 
-All data comes from the **Environment Agency Real-time Flood Monitoring API**:
+Data comes from two UK government sources:
+
+### Environment Agency Real-time Flood Monitoring API
 
 | Dataset | Endpoint | Description |
 |---------|----------|-------------|
@@ -32,6 +35,16 @@ All data comes from the **Environment Agency Real-time Flood Monitoring API**:
 **API Base URL**: `https://environment.data.gov.uk/flood-monitoring`
 
 **Documentation**: https://environment.data.gov.uk/flood-monitoring/doc/reference
+
+### British Geological Survey (BGS) OGC API
+
+| Dataset | Endpoint | Description |
+|---------|----------|-------------|
+| Landslides | `/collections/landslides/items` | Landslide locations and geological hazard data |
+
+**API Base URL**: `https://ogcapi.bgs.ac.uk`
+
+**Documentation**: https://ogcapi.bgs.ac.uk/openapi?f=html
 
 ## Severity Levels
 
