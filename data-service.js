@@ -83,6 +83,20 @@ const DataService = {
         }
     },
 
+    // BGS SensorThings Fetcher
+    async fetchBGSSensors() {
+        console.log('Fetching BGS Sensors...');
+        try {
+            const response = await fetch(this.ENDPOINTS.bgsSensors);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            return data.value || []; // OData 'value' array
+        } catch (error) {
+            console.error('Error fetching BGS Sensors:', error);
+            return [];
+        }
+    },
+
     // NRW Specific Fetchers
     async fetchNRWFloodAreas() {
         // GET /floodforecast/v2/areasatrisk

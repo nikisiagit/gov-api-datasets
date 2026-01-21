@@ -31,11 +31,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const lon = parseFloat(location.lon);
 
         // 2. Fetch All Data
-        const [stations, floods, landslides, nrwWarnings] = await Promise.all([
+        const [stations, floods, landslides, nrwWarnings, bgsSensors] = await Promise.all([
             DataService.fetchStations(),
             DataService.fetchFloods(),
             DataService.fetchLandslides(),
-            DataService.fetchNRWWarnings(lat, lon, 10000) // 10km radius for NRW
+            DataService.fetchNRWWarnings(lat, lon, 10000), // 10km radius for NRW
+            DataService.fetchBGSSensors()
         ]);
 
         // 3. Filter Data (Radius: 10km)
@@ -44,6 +45,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const nearbyStations = stations.filter(s => {
             if (!s.lat || !s.long) return false;
             return DataService.calculateDistance(lat, lon, s.lat, s.long) <= RADIUS_KM;
+        });
+
+        const nearbySensors = bgsSensors.filter(s => {
+            // Extract location: Things(1)/Locations[0]
+            const location = s.Locations && s.Locations.length > 0 ? s.Locations[0].location : null;
+            if (!location || location.type !== 'Point') return false;
+
+            const [lonS, latS] = location.coordinates;
+            return DataService.calculateDistance(lat, lon, latS, lonS) <= RADIUS_KM;
         });
 
         // Strict spatial filtering for Floods (EA)
@@ -76,13 +86,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // 4. Update UI
-        updateUI(nearbyStations, nearbyFloods, nearbyLandslides, nrwWarnings);
+        updateUI(nearbyStations, nearbyFloods, nearbyLandslides, nrwWarnings, nearbySensors);
 
         loading.style.display = 'none';
         results.style.display = 'grid';
     }
 
-    function updateUI(stations, localFloods, landslides, nrwWarnings) {
+    function updateUI(stations, localFloods, landslides, nrwWarnings, sensors) {
         // Stations
         document.getElementById('stationCount').innerText = stations.length;
         const stationList = document.getElementById('stationList');
@@ -94,6 +104,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const landslideList = document.getElementById('landslideList');
         landslideList.innerHTML = landslides.length === 0 ? '<li class="list-item">No records found.</li>' :
             landslides.map(l => `<li class="list-item"><strong>${l.properties.landslide_name || 'Landslide'}</strong><br><small>${l.properties.locality_details || ''}</small></li>`).join('');
+
+        // BGS Sensors
+        document.getElementById('sensorCount').innerText = sensors.length;
+        const sensorList = document.getElementById('sensorList');
+        sensorList.innerHTML = sensors.length === 0 ? '<li class="list-item">No sensors nearby.</li>' :
+            sensors.map(s => {
+                let readings = '';
+                if (s.Datastreams && s.Datastreams.length > 0) {
+                    s.Datastreams.slice(0, 3).forEach(ds => { // Limit to 3 displayed metrics
+                        const latestObs = ds.Observations && ds.Observations.length > 0 ? ds.Observations[0] : null;
+                        if (latestObs) {
+                            readings += `<span class="tag tag-warning" style="background:#f3e5f5; color:#7b1fa2; font-size:10px; margin-right:4px;">${ds.name.split(' ').pop()}: ${parseFloat(latestObs.result).toFixed(1)} ${ds.unitOfMeasurement?.symbol || ''}</span> `
+                        }
+                    });
+                }
+                return `<li class="list-item"><strong>${s.name}</strong><br>${readings}</li>`
+            }).join('');
+
 
         // Floods (EA + NRW) - STRICTLY LOCAL ONLY
         let floodContent = '';

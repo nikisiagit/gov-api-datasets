@@ -150,6 +150,53 @@ function createNRWLayer(data) {
     });
 }
 
+// Create BGS Sensors Layer
+function createBGSSensorsLayer(data) {
+    if (!data || !data.length) return;
+
+    const sensorMarkers = data.map(sensor => {
+        // Extract location: Things(1)/Locations[0]
+        const location = sensor.Locations && sensor.Locations.length > 0 ? sensor.Locations[0].location : null;
+        if (!location || location.type !== 'Point') return null;
+
+        const [lon, lat] = location.coordinates;
+
+        const marker = L.circleMarker([lat, lon], {
+            radius: 6,
+            fillColor: '#9c27b0', // Purple
+            color: '#fff',
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.8,
+            pane: 'pointsPane'
+        });
+
+        // Build Popup Content
+        let popupContent = `<div class="popup-title">📡 ${sensor.name}</div>`;
+        popupContent += `<div style="margin-bottom:8px; font-size:12px;">${sensor.description || 'Groundwater Logger'}</div>`;
+
+        if (sensor.Datastreams && sensor.Datastreams.length > 0) {
+            popupContent += '<table style="width:100%; font-size:11px; border-collapse: collapse;">';
+            sensor.Datastreams.forEach(ds => {
+                const propName = ds.ObservedProperty ? ds.ObservedProperty.name : ds.name;
+                const latestObs = ds.Observations && ds.Observations.length > 0 ? ds.Observations[0] : null;
+                const value = latestObs ? parseFloat(latestObs.result).toFixed(2) : 'N/A';
+                const unit = ds.unitOfMeasurement ? ds.unitOfMeasurement.symbol : '';
+
+                if (latestObs) {
+                    popupContent += `<tr><td style="padding:2px 0; color:#555;">${propName}</td><td style="text-align:right; font-weight:bold;">${value} ${unit}</td></tr>`;
+                }
+            });
+            popupContent += '</table>';
+        }
+
+        marker.bindPopup(popupContent);
+        return marker;
+    }).filter(m => m !== null);
+
+    layerGroups.bgsSensors = L.layerGroup(sensorMarkers);
+}
+
 
 // Add layer control
 function addLayerControl() {
@@ -158,6 +205,7 @@ function addLayerControl() {
         '<span style="color: #ff9800;">●</span> Flood Warnings (EA Floods API)': layerGroups.floods,
         '<span style="color: #6495ed;">▬</span> Flood Warning Areas (EA Flood Areas API)': layerGroups.floodAreas,
         '<span style="color: #8b4513;">●</span> Landslides (BGS API)': layerGroups.landslides,
+        '<span style="color: #9c27b0;">●</span> Groundwater Sensors (BGS API)': layerGroups.bgsSensors,
         '<span style="color: #555;">----</span> Local Authorities (ONS)': layerGroups.localAuthorities,
         '<span style="color: #008080;">▬</span> NRW Flood Risk (Wales)': layerGroups.nrwAreas
     };
