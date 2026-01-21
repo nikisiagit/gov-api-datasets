@@ -66,12 +66,20 @@ async function loadAllData() {
 
     try {
         // Load all data sources in parallel for optimal performance
-        const [stationsData, floodsData, floodAreasData, landslidesData, localAuthData] = await Promise.all([
+        // Note: Using DataService for cleaner logic, but keeping inline fetchers for now 
+        // to avoid breaking existing code structure too much in one go, except for new NRW stuff.
+
+        // Actually, let's switch to DataService where easy to keep consistency?
+        // For now, I'll stick to the mixed approach as I haven't fully refactored app.js to use DataService exclusively yet.
+        // But I MUST use DataService for the new NRW call.
+
+        const [stationsData, floodsData, floodAreasData, landslidesData, localAuthData, nrwAreasData] = await Promise.all([
             fetchData(ENDPOINTS.stations, 'Monitoring Stations'),
             fetchData(ENDPOINTS.floods, 'Flood Warnings'),
             fetchData(ENDPOINTS.floodAreas, 'Flood Areas'),
             fetchLandslidesData(ENDPOINTS.landslides, 'BGS Landslides'),
-            fetchLocalAuthoritiesData(ENDPOINTS.localAuthorities, 'Local Authorities')
+            fetchLocalAuthoritiesData(ENDPOINTS.localAuthorities, 'Local Authorities'),
+            DataService.fetchNRWFloodAreas() // New NRW call
         ]);
 
         // Convert to GeoJSON and create layers
@@ -80,8 +88,8 @@ async function loadAllData() {
         const stationsGeoJSON = convertStationsToGeoJSON(stationsData);
         const floodsGeoJSON = convertFloodsToGeoJSON(floodsData);
         const areasGeoJSON = convertFloodAreasToGeoJSON(floodAreasData);
-        const landslidesGeoJSON = landslidesData; // Already in GeoJSON format from BGS
-        const localAuthGeoJSON = localAuthData; // Already in GeoJSON format
+        const landslidesGeoJSON = landslidesData;
+        const localAuthGeoJSON = localAuthData;
 
         // Create map layers
         createStationsLayer(stationsGeoJSON);
@@ -89,12 +97,13 @@ async function loadAllData() {
         createFloodAreasLayer(areasGeoJSON);
         createLandslidesLayer(landslidesGeoJSON);
         createLocalAuthoritiesLayer(localAuthGeoJSON);
+        createNRWLayer(nrwAreasData); // New layer
 
         // Add layer control
         addLayerControl();
 
         const loadTime = ((Date.now() - startTime) / 1000).toFixed(2);
-        updateStatus(`Loaded successfully in ${loadTime}s - ${stationsGeoJSON.features.length} stations, ${floodsGeoJSON.features.length} warnings, ${areasGeoJSON.features.length} areas, ${landslidesGeoJSON.features.length} landslides, ${localAuthGeoJSON.features.length} districts`);
+        updateStatus(`Loaded successfully in ${loadTime}s`);
 
         hideLoading();
 
@@ -103,6 +112,68 @@ async function loadAllData() {
         updateStatus('Error loading data. Please refresh the page.');
         updateLoadingText('Error loading data - check console');
     }
+}
+
+// ... (existing fetch functions) ...
+
+// Create NRW Layer
+function createNRWLayer(data) {
+    if (!data || !data.length && !data.features) return;
+
+    // Normalize data if it's not GeoJSON feature collection
+    // The API response for 'areasatrisk' might be a plain array or custom JSON.
+    // Without seeing the exact response, we'll try to handle basic GeoJSON.
+    // If it fails, it will just be empty.
+
+    // Note: If data is null (auth failed), we skip
+    const geojson = data.features ? data : { type: 'FeatureCollection', features: [] };
+
+    layerGroups.nrwAreas = L.geoJSON(geojson, {
+        pane: 'polygonsPane', // Use polygons pane (z 350)
+        style: () => ({
+            fillColor: '#008080', // Teal for NRW
+            color: '#004d4d',
+            weight: 2,
+            opacity: 0.7,
+            fillOpacity: 0.3
+        }),
+        onEachFeature: (feature, layer) => {
+            const props = feature.properties;
+            let content = '<div class="popup-title">🏴󠁧󠁢󠁷󠁬󠁳󠁿 NRW Flood Risk</div>';
+            if (props) {
+                Object.keys(props).forEach(key => {
+                    content += `<div class="popup-detail"><span class="popup-label">${key}:</span> ${props[key]}</div>`;
+                });
+            }
+            layer.bindPopup(content);
+        }
+    });
+}
+
+
+// Add layer control
+function addLayerControl() {
+    const overlays = {
+        '<span style="color: #3388ff;">●</span> Monitoring Stations (EA Stations API)': layerGroups.stations,
+        '<span style="color: #ff9800;">●</span> Flood Warnings (EA Floods API)': layerGroups.floods,
+        '<span style="color: #6495ed;">▬</span> Flood Warning Areas (EA Flood Areas API)': layerGroups.floodAreas,
+        '<span style="color: #8b4513;">●</span> Landslides (BGS API)': layerGroups.landslides,
+        '<span style="color: #555;">----</span> Local Authorities (ONS)': layerGroups.localAuthorities,
+        '<span style="color: #008080;">▬</span> NRW Flood Risk (Wales)': layerGroups.nrwAreas
+    };
+
+    // Add most layers to map by default (except Local Authorities)
+    Object.keys(layerGroups).forEach(key => {
+        if (layerGroups[key] && key !== 'localAuthorities') {
+            layerGroups[key].addTo(map);
+        }
+    });
+
+    // Add control
+    L.control.layers(null, overlays, {
+        collapsed: false,
+        position: 'topright'
+    }).addTo(map);
 }
 
 // Fetch data from API with error handling

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - UK Hazard Map</title>
+    <link rel="stylesheet" href="data-style.css"> <!-- Reusing or new style -->
+    <style>
+        :root {
+            --primary: #3388ff;
+            --danger: #d32f2f;
+            --warning: #ff9800;
+            --surface: #ffffff;
+            --bg: #f4f7f6;
+            --text: #333;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        header {
+            background: var(--surface);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .btn-link {
+            text-decoration: none;
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .search-section {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .search-input {
+            width: 100%;
+            max-width: 500px;
+            padding: 1rem;
+            font-size: 1.1rem;
+            border: 2px solid #ddd;
+            border-radius: 50px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            display: none;
+            /* Hidden until search */
+        }
+
+        .card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            border-bottom: 2px solid var(--bg);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+            color: #555;
+        }
+
+        .stat-huge {
+            font-size: 3rem;
+            font-weight: bold;
+            color: var(--primary);
+            text-align: center;
+            display: block;
+        }
+
+        .list-group {
+            list-style: none;
+            padding: 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .list-item {
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #eee;
+            font-size: 0.95rem;
+        }
+
+        .list-item:first-child {
+            border-top: 1px solid #eee;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+
+        .tag-severe {
+            background: #ffebee;
+            color: var(--danger);
+        }
+
+        .tag-warning {
+            background: #fff3e0;
+            color: var(--warning);
+        }
+
+        .loading {
+            text-align: center;
+            color: #777;
+            margin-top: 2rem;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>Hazard Dashboard</h1>
+        <a href="index.html" class="btn-link">← Back to Map</a>
+    </header>
+
+    <div class="container">
+        <div class="search-section">
+            <h2>Find Local Hazards</h2>
+            <p>Enter a city or town to see flood risks and landslides within 10km.</p>
+            <input type="text" id="locationInput" class="search-input" placeholder="e.g. Bristol, Manchester, York...">
+        </div>
+
+        <div id="loading" class="loading">Buttling data...</div>
+
+        <div id="results" class="dashboard-grid">
+            <!-- Summary Stats -->
+            <div class="card">
+                <h2>Flood Alerts Nearby</h2>
+                <span id="floodCount" class="stat-huge">0</span>
+                <p style="text-align: center; color: #777;">Active alerts within 10km</p>
+                <ul id="floodList" class="list-group"></ul>
+            </div>
+
+            <div class="card">
+                <h2>Monitoring Stations</h2>
+                <span id="stationCount" class="stat-huge">0</span>
+                <p style="text-align: center; color: #777;">Stations found nearby</p>
+                <ul id="stationList" class="list-group"></ul>
+            </div>
+
+            <div class="card">
+                <h2>Landslides</h2>
+                <span id="landslideCount" class="stat-huge" style="color: #8b4513;">0</span>
+                <p style="text-align: center; color: #777;">Recorded events nearby</p>
+                <ul id="landslideList" class="list-group"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="data-service.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+
+</html>
