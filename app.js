@@ -260,6 +260,10 @@ function getSeverityText(level) {
 // Create stations layer
 function createStationsLayer(geojson) {
     layerGroups.stations = L.geoJSON(geojson, {
+        coordsToLatLng: (coords) => {
+            // GeoJSON is [lng, lat], Leaflet expects [lat, lng]
+            return L.latLng(coords[1], coords[0]);
+        },
         pointToLayer: (feature, latlng) => {
             return L.circleMarker(latlng, {
                 radius: 6,
@@ -291,6 +295,10 @@ function createStationsLayer(geojson) {
 // Create floods layer
 function createFloodsLayer(geojson) {
     layerGroups.floods = L.geoJSON(geojson, {
+        coordsToLatLng: (coords) => {
+            // GeoJSON is [lng, lat], Leaflet expects [lat, lng]
+            return L.latLng(coords[1], coords[0]);
+        },
         pointToLayer: (feature, latlng) => {
             const severity = feature.properties.severity;
             let color;
@@ -341,6 +349,10 @@ function createFloodsLayer(geojson) {
 // Create flood areas layer
 function createFloodAreasLayer(geojson) {
     layerGroups.floodAreas = L.geoJSON(geojson, {
+        coordsToLatLng: (coords) => {
+            // GeoJSON is [lng, lat], Leaflet expects [lat, lng]
+            return L.latLng(coords[1], coords[0]);
+        },
         style: () => ({
             fillColor: '#6495ed',
             color: '#4169e1',
