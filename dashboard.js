@@ -103,7 +103,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('landslideCount').innerText = landslides.length;
         const landslideList = document.getElementById('landslideList');
         landslideList.innerHTML = landslides.length === 0 ? '<li class="list-item">No records found.</li>' :
-            landslides.map(l => `<li class="list-item"><strong>${l.properties.landslide_name || 'Landslide'}</strong><br><small>${l.properties.locality_details || ''}</small></li>`).join('');
+            landslides.map(l => {
+                const year = l.properties.last_known_date_year;
+                const dateDisplay = (year && year !== 'UNKNOWN') ? `Year: ${year}` : 'Date Unknown';
+                return `<li class="list-item">
+                    <strong>${l.properties.landslide_name || 'Landslide'}</strong><br>
+                    <small>${dateDisplay} • ${l.properties.locality_details || 'No location details'}</small>
+                </li>`;
+            }).join('');
 
         // BGS Sensors
         document.getElementById('sensorCount').innerText = sensors.length;
