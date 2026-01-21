@@ -411,30 +411,12 @@ function convertFloodsToGeoJSON(floods, floodAreas = []) {
             };
         });
 
-    return {
-        type: 'Feature',
-        geometry: {
-            type: 'Point',
-            coordinates: coordinates
-        },
-        properties: {
-            id: flood['@id'],
-            areaName: flood.eaAreaName,
-            severity: flood.severityLevel || 3,
-            severityText: getSeverityText(flood.severityLevel),
-            description: flood.description || 'No description available',
-            message: flood.message || '',
-            timeRaised: flood.timeRaised || 'Unknown',
-            timeChanged: flood.timeMessageChanged || flood.timeRaised || 'Unknown',
-            type: 'flood'
-        }
-    };
-});
 
-return {
-    type: 'FeatureCollection',
-    features: features
-};
+
+    return {
+        type: 'FeatureCollection',
+        features: features
+    };
 }
 
 // Convert flood areas to GeoJSON
