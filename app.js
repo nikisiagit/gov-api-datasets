@@ -51,10 +51,10 @@ function initializeMap() {
 
     // Create panes to control z-index
     map.createPane('polygonsPane');
-    map.getPane('polygonsPane').style.zIndex = 400;
+    map.getPane('polygonsPane').style.zIndex = 350;
 
     map.createPane('pointsPane');
-    map.getPane('pointsPane').style.zIndex = 500;
+    map.getPane('pointsPane').style.zIndex = 650;
 
     updateStatus('Map initialized');
 }
@@ -561,9 +561,11 @@ function addLayerControl() {
         '<span style="color: #555;">----</span> Local Authorities (ONS)': layerGroups.localAuthorities
     };
 
-    // Add all layers to map by default
-    Object.values(layerGroups).forEach(layer => {
-        if (layer) layer.addTo(map);
+    // Add most layers to map by default (except Local Authorities to prevent clutter)
+    Object.keys(layerGroups).forEach(key => {
+        if (layerGroups[key] && key !== 'localAuthorities') {
+            layerGroups[key].addTo(map);
+        }
     });
 
     // Add control
