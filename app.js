@@ -9,7 +9,7 @@ const ENDPOINTS = {
     stations: `${API_BASE}/id/stations`,
     floods: `${API_BASE}/id/floods`,
     floodAreas: `${API_BASE}/id/floodAreas`,
-    landslides: `${BGS_API_BASE}/collections/landslides/items?f=json&limit=5000`,
+    landslides: `${BGS_API_BASE}/collections/landslideindex/items?f=json&limit=5000`,
     localAuthorities: 'https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LAD_MAY_2025_UK_BGC_V2/FeatureServer/0/query?outFields=*&where=1%3D1&f=geojson'
 };
 
@@ -59,7 +59,7 @@ async function loadAllData() {
 
     try {
         // Load all data sources in parallel for optimal performance
-        const [stationsData, floodsData, floodAreasData, landslidesData] = await Promise.all([
+        const [stationsData, floodsData, floodAreasData, landslidesData, localAuthData] = await Promise.all([
             fetchData(ENDPOINTS.stations, 'Monitoring Stations'),
             fetchData(ENDPOINTS.floods, 'Flood Warnings'),
             fetchData(ENDPOINTS.floodAreas, 'Flood Areas'),
