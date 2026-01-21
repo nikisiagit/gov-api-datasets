@@ -131,5 +131,36 @@ const DataService = {
             console.error('Geocoding error:', error);
             return null;
         }
+    },
+
+    // Extract polygon coordinates from WKT or other format
+    extractPolygonCoordinates(polygon) {
+        try {
+            if (typeof polygon === 'string') {
+                // Handle WKT format: POLYGON((lon lat, lon lat, ...))
+                const match = polygon.match(/POLYGON\s*\(\((.*?)\)\)/i);
+                if (match) {
+                    const coordPairs = match[1].split(',');
+                    return coordPairs.map(pair => {
+                        const [lon, lat] = pair.trim().split(/\s+/);
+                        return [parseFloat(lon), parseFloat(lat)];
+                    }).filter(coord => !isNaN(coord[0]) && !isNaN(coord[1]));
+                }
+            }
+        } catch (error) {
+            console.error('Error extracting polygon coordinates:', error);
+        }
+        return [];
+    },
+
+    // Calculate centroid of polygon
+    calculateCentroid(coordinates) {
+        if (!coordinates || coordinates.length === 0) return null;
+        let sumLon = 0, sumLat = 0;
+        coordinates.forEach(coord => {
+            sumLon += coord[0];
+            sumLat += coord[1];
+        });
+        return [sumLon / coordinates.length, sumLat / coordinates.length];
     }
 };
