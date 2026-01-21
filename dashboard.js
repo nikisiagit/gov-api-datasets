@@ -31,13 +31,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const lon = parseFloat(location.lon);
 
         // 2. Fetch All Data
-        const [stations, floods, landslides, nrwWarnings, bgsSensors] = await Promise.all([
+        // Includes floodAreas for polygon lookup
+        const [stations, floods, floodAreas, landslides, nrwWarnings, bgsSensors] = await Promise.all([
             DataService.fetchStations(),
             DataService.fetchFloods(),
+            DataService.fetchFloodAreas(),
             DataService.fetchLandslides(),
             DataService.fetchNRWWarnings(lat, lon, 10000), // 10km radius for NRW
             DataService.fetchBGSSensors()
         ]);
+
+        // Create Area Lookup
+        const areaMap = new Map();
+        if (floodAreas) {
+            floodAreas.forEach(area => {
+                if (area['@id'] && area.polygon) {
+                    areaMap.set(area['@id'], area.polygon);
+                    if (area.floodAreaID) areaMap.set(area.floodAreaID, area.polygon);
+                }
+            });
+        }
 
         // 3. Filter Data (Radius: 10km)
         const RADIUS_KM = 10;
@@ -58,15 +71,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Strict spatial filtering for Floods (EA)
         const nearbyFloods = floods.filter(f => {
-            // 1. Check if it has direct lat/long (rare but possible)
+            // 1. Check if it has direct lat/long
             if (f.lat && f.long) {
                 return DataService.calculateDistance(lat, lon, f.lat, f.long) <= RADIUS_KM;
             }
 
-            // 2. Check if it has a floodArea with polygon
-            // Note: This relies on the new helper in DataService
-            if (f.floodArea && f.floodArea.polygon) {
-                const coords = DataService.extractPolygonCoordinates(f.floodArea.polygon);
+            // 2. Check if it has a floodArea polygon (embedded or lookup)
+            let polygon = f.floodArea ? f.floodArea.polygon : null;
+
+            // If embedded polygon is just a URL, try lookup
+            if (!polygon || (typeof polygon === 'string' && !polygon.startsWith('POLYGON'))) {
+                const areaID = f.floodArea ? f.floodArea['@id'] : f.floodAreaID;
+                polygon = areaMap.get(areaID);
+            }
+
+            if (polygon && typeof polygon === 'string') {
+                const coords = DataService.extractPolygonCoordinates(polygon);
                 const centroid = DataService.calculateCentroid(coords);
                 if (centroid) {
                     // Centroid is [lon, lat]
