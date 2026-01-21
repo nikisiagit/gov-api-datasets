@@ -97,6 +97,20 @@ const DataService = {
         }
     },
 
+    async fetchPolygon(url) {
+        if (!url) return null;
+        try {
+            // Note: Some URLs might redirect (301), fetch handles this automatically.
+            const response = await fetch(url);
+            if (!response.ok) return null;
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            // console.error('Error fetching polygon:', url, error); // Suppress log spam
+            return null;
+        }
+    },
+
     // NRW Specific Fetchers
     async fetchNRWFloodAreas() {
         // GET /floodforecast/v2/areasatrisk
