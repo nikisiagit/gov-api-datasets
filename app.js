@@ -49,6 +49,13 @@ function initializeMap() {
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
+    // Create panes to control z-index
+    map.createPane('polygonsPane');
+    map.getPane('polygonsPane').style.zIndex = 400;
+
+    map.createPane('pointsPane');
+    map.getPane('pointsPane').style.zIndex = 500;
+
     updateStatus('Map initialized');
 }
 
@@ -324,6 +331,7 @@ function getSeverityText(level) {
 // Create stations layer
 function createStationsLayer(geojson) {
     layerGroups.stations = L.geoJSON(geojson, {
+        pane: 'pointsPane',
         coordsToLatLng: (coords) => {
             // GeoJSON is [lng, lat], Leaflet expects [lat, lng]
             return L.latLng(coords[1], coords[0]);
@@ -359,6 +367,7 @@ function createStationsLayer(geojson) {
 // Create floods layer
 function createFloodsLayer(geojson) {
     layerGroups.floods = L.geoJSON(geojson, {
+        pane: 'pointsPane',
         coordsToLatLng: (coords) => {
             // GeoJSON is [lng, lat], Leaflet expects [lat, lng]
             return L.latLng(coords[1], coords[0]);
@@ -413,6 +422,7 @@ function createFloodsLayer(geojson) {
 // Create flood areas layer
 function createFloodAreasLayer(geojson) {
     layerGroups.floodAreas = L.geoJSON(geojson, {
+        pane: 'polygonsPane',
         coordsToLatLng: (coords) => {
             // GeoJSON is [lng, lat], Leaflet expects [lat, lng]
             return L.latLng(coords[1], coords[0]);
@@ -458,6 +468,7 @@ function createFloodAreasLayer(geojson) {
 // Create landslides layer
 function createLandslidesLayer(geojson) {
     layerGroups.landslides = L.geoJSON(geojson, {
+        pane: 'pointsPane',
         coordsToLatLng: (coords) => {
             // GeoJSON is [lng, lat], Leaflet expects [lat, lng]
             return L.latLng(coords[1], coords[0]);
@@ -501,6 +512,7 @@ function createLandslidesLayer(geojson) {
 // Create Local Authorities layer
 function createLocalAuthoritiesLayer(geojson) {
     layerGroups.localAuthorities = L.geoJSON(geojson, {
+        pane: 'polygonsPane',
         style: () => ({
             fillColor: 'transparent',
             color: '#555',
