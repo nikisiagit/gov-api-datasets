@@ -394,73 +394,27 @@ function convertFloodsToGeoJSON(floods, floodAreas = [], polygonCache = new Map(
                 type: 'Feature',
                 geometry: geometry,
 
-                // 1. Try generic lat/long
-                if(flood.lat && flood.long) {
-                    coordinates = [flood.long, flood.lat];
-    foundLocation = true;
-}
-
-// 2. Try embedded polygon (rare for alerts)
-if (!foundLocation && flood.floodArea && flood.floodArea.polygon) {
-    const polygon = flood.floodArea.polygon;
-    // If it's a real WKT string
-    if (typeof polygon === 'string' && polygon.startsWith('POLYGON')) {
-        const coords = extractPolygonCoordinates(polygon);
-        if (coords.length > 0) {
-            coordinates = calculateCentroid(coords);
-            foundLocation = true;
-        }
-    }
-}
-
-// 3. Try Lookup from Flood Areas (The Fix)
-if (!foundLocation && flood.floodAreaID) {
-    // Try to find the polygon in our loaded areas
-    // The floodArea in the alert usually has an @id like http://.../floodAreas/ID
-    const areaIDUrl = flood.floodArea['@id'];
-
-    let polygon = areaMap.get(areaIDUrl) || areaMap.get(flood.floodAreaID);
-
-    if (polygon && typeof polygon === 'string' && polygon.startsWith('POLYGON')) {
-        const coords = extractPolygonCoordinates(polygon);
-        if (coords.length > 0) {
-            coordinates = calculateCentroid(coords);
-            foundLocation = true;
-        }
-    }
-}
-
-// If we still have no location, we might want to skip it or put it in a "Unknown" bucket
-// But for now we keep the default but maybe flag it?
-// Actually, let's just use the default but it will be visible in the middle of nowhere (Derby-ish).
-
-return {
-    type: 'Feature',
-    geometry: {
-        type: 'Point',
-        coordinates: coordinates
-    },
-    properties: {
-        id: flood['@id'],
-        areaName: flood.eaAreaName,
-        severity: flood.severityLevel || 3,
-        severityText: getSeverityText(flood.severityLevel),
-        description: flood.description || 'No description available',
-        message: flood.message || '',
-        timeRaised: flood.timeRaised || 'Unknown',
-        timeChanged: flood.timeMessageChanged || flood.timeRaised || 'Unknown',
-        type: 'flood',
-        hasLocation: foundLocation
-    }
-};
-        });
+                properties: {
+                    id: flood['@id'],
+                    areaName: flood.eaAreaName,
+                    severity: flood.severityLevel || 3,
+                    severityText: getSeverityText(flood.severityLevel),
+                    description: flood.description || 'No description available',
+                    message: flood.message || '',
+                    timeRaised: flood.timeRaised || 'Unknown',
+                    timeChanged: flood.timeMessageChanged || flood.timeRaised || 'Unknown',
+                    type: 'flood',
+                    hasLocation: foundLocation
+                }
+            };
+        }).filter(f => f !== null);
 
 
 
-return {
-    type: 'FeatureCollection',
-    features: features
-};
+    return {
+        type: 'FeatureCollection',
+        features: features
+    };
 }
 
 // Convert flood areas to GeoJSON
