@@ -1,8 +1,9 @@
 // UK Flood Monitoring Map Application
-// Data sources: Environment Agency Real-time Flood Monitoring API & BGS Landslide Data
+// Data sources: Environment Agency, BGS, and DEFRA Air Quality
 
 const API_BASE = 'https://environment.data.gov.uk/flood-monitoring';
 const BGS_API_BASE = 'https://ogcapi.bgs.ac.uk';
+const AIR_QUALITY_API = 'https://api.erg.ic.ac.uk/AirQuality';
 
 // API Endpoints
 const ENDPOINTS = {
@@ -10,7 +11,8 @@ const ENDPOINTS = {
     floods: `${API_BASE}/id/floods`,
     floodAreas: `${API_BASE}/id/floodAreas`,
     landslides: `${BGS_API_BASE}/collections/landslideindex/items?f=json&limit=5000`,
-    localAuthorities: 'https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LAD_MAY_2025_UK_BGC_V2/FeatureServer/0/query?outFields=*&where=1%3D1&f=geojson'
+    localAuthorities: 'https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LAD_MAY_2025_UK_BGC_V2/FeatureServer/0/query?outFields=*&where=1%3D1&f=geojson',
+    airQuality: `${AIR_QUALITY_API}/Information/MonitoringSites/GroupName=All/Json`
 };
 
 // Global map and layer groups
@@ -20,7 +22,8 @@ let layerGroups = {
     floods: null,
     floodAreas: null,
     landslides: null,
-    localAuthorities: null
+    localAuthorities: null,
+    airQuality: null
 };
 
 // Status tracking
@@ -73,13 +76,14 @@ async function loadAllData() {
         // For now, I'll stick to the mixed approach as I haven't fully refactored app.js to use DataService exclusively yet.
         // But I MUST use DataService for the new NRW call.
 
-        const [stationsData, floodsData, floodAreasData, landslidesData, localAuthData, nrwAreasData] = await Promise.all([
+        const [stationsData, floodsData, floodAreasData, landslidesData, localAuthData, nrwAreasData, airQualityData] = await Promise.all([
             fetchData(ENDPOINTS.stations, 'Monitoring Stations'),
             fetchData(ENDPOINTS.floods, 'Flood Warnings'),
             fetchData(ENDPOINTS.floodAreas, 'Flood Areas'),
             fetchLandslidesData(ENDPOINTS.landslides, 'BGS Landslides'),
             fetchLocalAuthoritiesData(ENDPOINTS.localAuthorities, 'Local Authorities'),
-            DataService.fetchNRWFloodAreas() // New NRW call
+            DataService.fetchNRWFloodAreas(), // New NRW call
+            fetchAirQualityData(ENDPOINTS.airQuality, 'Air Quality Stations')
         ]);
 
         // Convert to GeoJSON and create layers
@@ -90,6 +94,7 @@ async function loadAllData() {
         const areasGeoJSON = convertFloodAreasToGeoJSON(floodAreasData);
         const landslidesGeoJSON = landslidesData;
         const localAuthGeoJSON = localAuthData;
+        const airQualityGeoJSON = airQualityData;
 
         // Create map layers
         createStationsLayer(stationsGeoJSON);
@@ -98,6 +103,7 @@ async function loadAllData() {
         createLandslidesLayer(landslidesGeoJSON);
         createLocalAuthoritiesLayer(localAuthGeoJSON);
         createNRWLayer(nrwAreasData); // New layer
+        createAirQualityLayer(airQualityGeoJSON);
 
         // Add layer control
         addLayerControl();
@@ -197,6 +203,41 @@ function createBGSSensorsLayer(data) {
     layerGroups.bgsSensors = L.layerGroup(sensorMarkers);
 }
 
+// Create air quality layer
+function createAirQualityLayer(geojson) {
+    layerGroups.airQuality = L.geoJSON(geojson, {
+        coordsToLatLng: (coords) => {
+            // GeoJSON is [lng, lat], Leaflet expects [lat, lng]
+            return L.latLng(coords[1], coords[0]);
+        },
+        pointToLayer: (feature, latlng) => {
+            return L.circleMarker(latlng, {
+                radius: 6,
+                fillColor: '#4caf50',
+                color: '#fff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8
+            });
+        },
+        onEachFeature: (feature, layer) => {
+            const props = feature.properties;
+            const popup = `
+                <div class="popup-title">🌫️ ${props.name}</div>
+                <div class="popup-detail"><span class="popup-label">Site Code:</span> ${props.id}</div>
+                <div class="popup-detail"><span class="popup-label">Type:</span> ${props.type}</div>
+                <div class="popup-detail"><span class="popup-label">Network:</span> ${props.network}</div>
+                <div class="popup-detail"><span class="popup-label">Opened:</span> ${props.dateOpened}</div>
+                <div class="popup-detail"><span class="popup-label">Status:</span> ${props.dateClosed === 'Active' ? 'Active' : 'Closed ' + props.dateClosed}</div>
+                <div class="popup-detail" style="margin-top: 8px; font-size: 11px; color: #999;">
+                    Source: DEFRA Air Quality API
+                </div>
+            `;
+            layer.bindPopup(popup);
+        }
+    });
+}
+
 
 // Add layer control
 function addLayerControl() {
@@ -207,7 +248,8 @@ function addLayerControl() {
         '<span style="color: #8b4513;">●</span> Landslides (BGS API)': layerGroups.landslides,
         '<span style="color: #9c27b0;">●</span> Groundwater Sensors (BGS API)': layerGroups.bgsSensors,
         '<span style="color: #555;">----</span> Local Authorities (ONS)': layerGroups.localAuthorities,
-        '<span style="color: #008080;">▬</span> NRW Flood Risk (Wales)': layerGroups.nrwAreas
+        '<span style="color: #008080;">▬</span> NRW Flood Risk (Wales)': layerGroups.nrwAreas,
+        '<span style="color: #4caf50;">●</span> Air Quality Stations (DEFRA API)': layerGroups.airQuality
     };
 
     // Add most layers to map by default (except Local Authorities)
@@ -291,6 +333,52 @@ async function fetchLocalAuthoritiesData(url, name) {
         return {
             type: 'FeatureCollection',
             features: data.features || []
+        };
+
+    } catch (error) {
+        console.error(`Error fetching ${name}:`, error);
+        updateStatus(`Warning: Could not load ${name}`);
+        return { type: 'FeatureCollection', features: [] };
+    }
+}
+
+// Fetch air quality data from DEFRA API
+async function fetchAirQualityData(url, name) {
+    updateLoadingText(`Fetching ${name}...`);
+
+    try {
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log(`${name} loaded:`, data.Sites?.Site?.length || 0, 'sites');
+
+        // Convert air quality stations to GeoJSON
+        const sites = data.Sites?.Site || [];
+        const features = sites
+            .filter(site => site['@Latitude'] && site['@Longitude'])
+            .map(site => ({
+                type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: [parseFloat(site['@Longitude']), parseFloat(site['@Latitude'])]
+                },
+                properties: {
+                    id: site['@SiteCode'],
+                    name: site['@SiteName'],
+                    type: site['@SiteType'] || 'N/A',
+                    network: site['@NetworkName'] || 'DEFRA',
+                    dateOpened: site['@DateOpened'] || 'N/A',
+                    dateClosed: site['@DateClosed'] || 'Active'
+                }
+            }));
+
+        return {
+            type: 'FeatureCollection',
+            features: features
         };
 
     } catch (error) {

@@ -111,6 +111,10 @@
             background: #8b4513;
         }
 
+        .legend-icon.air-quality {
+            background: #4caf50;
+        }
+
         .loading-overlay {
             position: absolute;
             top: 0;
@@ -272,18 +276,22 @@
             <div class="legend-icon" style="border: 2px dashed #555; background: transparent;"></div>
             <span>Local Authority District</span>
         </div>
+        <div class="legend-item">
+            <div class="legend-icon air-quality"></div>
+            <span>Air Quality Station</span>
+        </div>
     </div>
 
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
-        <div class="loading-text" id="loadingText">Loading hazard data...</div>
+        <div class="loading-text" id="loadingText">Loading environmental data...</div>
     </div>
 
     <div class="status-bar">
         <div id="statusText">Initializing...</div>
         <div class="attribution">
             Data from Environment Agency Real-time Flood Monitoring API (Beta), British Geological Survey (BGS) OGC API,
-            and Office for National Statistics (ONS)
+            Office for National Statistics (ONS), and DEFRA Air Quality Network
         </div>
     </div>
 
